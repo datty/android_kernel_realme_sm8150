@@ -4,10 +4,11 @@
 
 #include <linux/types.h>
 
+#if !defined(__BIONIC__) && !defined(__ANDROID__)
 struct sched_param {
 	int sched_priority;
 };
-
+#endif
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
 /*
