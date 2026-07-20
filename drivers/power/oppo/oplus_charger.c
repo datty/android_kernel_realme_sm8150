@@ -812,10 +812,17 @@ int oplus_battery_get_property(struct power_supply *psy,
 #endif
 #ifndef CONFIG_OPLUS_SDM670_CHARGER
 		case POWER_SUPPLY_PROP_CHARGE_FULL:
-			val->intval = chip->batt_fcc;
+			/*
+			 * batt_fcc is mAh (oplus gauge / dual-cell). Android
+			 * health + Settings expect µAh for charge_full
+			 * (batteryFullChargeUah). Without *1000, Settings shows
+			 * e.g. 2 mAh when FCC is 2000 mAh.
+			 */
+			val->intval = chip->batt_fcc * 1000;
 			break;
 #endif
 		case POWER_SUPPLY_PROP_BATTERY_FCC:
+			/* Oplus proprietary node — keep mAh for internal tools */
 			val->intval = chip->batt_fcc;
 			break;
 		case POWER_SUPPLY_PROP_BATTERY_SOH:

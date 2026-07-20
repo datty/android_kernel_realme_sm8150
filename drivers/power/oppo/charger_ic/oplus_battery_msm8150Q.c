@@ -11680,6 +11680,17 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 		val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
+#ifdef OPLUS_FEATURE_CHG_BASIC
+		/*
+		 * Prefer oplus learned FCC (mAh) converted to µAh. QCOM BMS
+		 * charge_full is often wrong/mis-scaled on dual-cell VOOC packs,
+		 * which makes Settings "Maximum capacity" show ~2 mAh.
+		 */
+		if (g_oplus_chip && g_oplus_chip->batt_fcc > 0) {
+			val->intval = g_oplus_chip->batt_fcc * 1000;
+			break;
+		}
+#endif
 		rc = smblib_get_prop_from_bms(chg,
 				POWER_SUPPLY_PROP_CHARGE_FULL, val);
 		break;
