@@ -10526,6 +10526,25 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		rc = smblib_get_prop_usb_voltage_max_design(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+#ifdef OPLUS_FEATURE_CHG_BASIC
+		/*
+		 * During VOOC/SVOOC the SMB ICL path is not the real charge
+		 * path; health still uses usb voltage_max for charge-speed UI.
+		 */
+		if (oplus_vooc_get_fastchg_started() == true
+				|| oplus_vooc_get_fastchg_to_normal() == true
+				|| oplus_vooc_get_fastchg_dummy_started() == true) {
+			int ftype = oplus_vooc_get_fast_chg_type();
+
+			if (ftype == CHARGER_SUBTYPE_FASTCHG_VOOC
+					|| ftype == VOOC_ADAPTER_1
+					|| ftype == VOOC_ADAPTER_2)
+				val->intval = 5000000;
+			else
+				val->intval = 10000000;
+			break;
+		}
+#endif
 		rc = smblib_get_prop_usb_voltage_max(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT:
@@ -10541,6 +10560,21 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		val->intval = get_client_vote(chg->usb_icl_votable, PD_VOTER);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
+#ifdef OPLUS_FEATURE_CHG_BASIC
+		if (oplus_vooc_get_fastchg_started() == true
+				|| oplus_vooc_get_fastchg_to_normal() == true
+				|| oplus_vooc_get_fastchg_dummy_started() == true) {
+			int ftype = oplus_vooc_get_fast_chg_type();
+
+			if (ftype == CHARGER_SUBTYPE_FASTCHG_VOOC
+					|| ftype == VOOC_ADAPTER_1
+					|| ftype == VOOC_ADAPTER_2)
+				val->intval = 4000000;
+			else
+				val->intval = 5000000;
+			break;
+		}
+#endif
 		rc = smblib_get_prop_input_current_settled(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
@@ -11328,6 +11362,9 @@ static int smb5_init_dc_psy(struct smb5 *chip)
  static enum power_supply_property ac_props[] = {
 /*oplus own ac props*/
         POWER_SUPPLY_PROP_ONLINE,
+	/* Needed by healthd BatteryMonitor for charge-speed UI */
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 };
 
 static int smb5_ac_get_property(struct power_supply *psy,

@@ -153,6 +153,9 @@ enum power_supply_property oplus_usb_props[] = {
 
 enum power_supply_property oplus_ac_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
+	/* Health/SystemUI charge-speed (slow/regular/fast) uses these. */
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 #ifdef CONFIG_OPLUS_FAST2NORMAL_CHG
 	POWER_SUPPLY_PROP_FAST2NORMAL_CHG,
 #endif
@@ -334,11 +337,48 @@ static void usb_update(struct oplus_chg_chip *chip)
 }
 #endif
 
+/*
+ * Report AC current_max / voltage_max in Android units (µA / µV).
+ * BatteryMonitor uses these for EXTRA_MAX_CHARGING_* → lockscreen
+ * "Charging slowly / Charging / Charging rapidly". Without them, SuperVOOC
+ * still charges fast via the VOOC path while UI stays on "slowly".
+ */
+static void oplus_ac_get_max_charge_ua_uv(struct oplus_chg_chip *chip,
+		int *curr_ua, int *volt_uv)
+{
+	int ftype;
+
+	*curr_ua = 500000;	/* 0.5A */
+	*volt_uv = 5000000;	/* 5V */
+
+	if (oplus_vooc_get_fastchg_started() == true
+			|| oplus_vooc_get_fastchg_to_normal() == true
+			|| oplus_vooc_get_fastchg_to_warm() == true
+			|| oplus_vooc_get_fastchg_dummy_started() == true) {
+		ftype = oplus_vooc_get_fast_chg_type();
+		if (ftype == CHARGER_SUBTYPE_FASTCHG_VOOC
+				|| ftype == VOOC_ADAPTER_1
+				|| ftype == VOOC_ADAPTER_2) {
+			/* classic VOOC ~20W class */
+			*curr_ua = 4000000;
+			*volt_uv = 5000000;
+		} else {
+			/* SuperVOOC / SVOOC ~50W class (RMX1931) */
+			*curr_ua = 5000000;
+			*volt_uv = 10000000;
+		}
+	} else if (chip && chip->charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
+		*curr_ua = 2000000;
+		*volt_uv = 5000000;
+	}
+}
+
 int oplus_ac_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
 {
 	int ret = 0;
+	int curr_ua = 0, volt_uv = 0;
 	//struct oplus_chg_chip *chip = container_of(psy->desc, struct oplus_chg_chip, ac_psd);
 	struct oplus_chg_chip *chip = g_charger_chip;
 
@@ -371,6 +411,14 @@ int oplus_ac_get_property(struct power_supply *psy,
 	switch (psp) {
 		case POWER_SUPPLY_PROP_ONLINE:
 			val->intval = chip->ac_online;
+			break;
+		case POWER_SUPPLY_PROP_CURRENT_MAX:
+			oplus_ac_get_max_charge_ua_uv(chip, &curr_ua, &volt_uv);
+			val->intval = curr_ua;
+			break;
+		case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+			oplus_ac_get_max_charge_ua_uv(chip, &curr_ua, &volt_uv);
+			val->intval = volt_uv;
 			break;
 #ifdef CONFIG_OPLUS_FAST2NORMAL_CHG
 		case POWER_SUPPLY_PROP_FAST2NORMAL_CHG:
