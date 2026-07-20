@@ -693,7 +693,15 @@ int oplus_battery_get_property(struct power_supply *psy,
 			} else {
 				chip->icharging = oplus_gauge_get_batt_current();
 			}
-			val->intval = chip->icharging;
+			/*
+			 * Gauge / oplus internals keep icharging in mA.
+			 * Android power_supply + BatteryManager expect µA
+			 * (same scale as VOLTAGE_NOW: batt_volt mV * 1000 → µV).
+			 * Without this, SystemUI shows ~1/1000 current (e.g. 4mA
+			 * instead of 4000mA), 0.0W, and "Charging slowly" even
+			 * under SuperVOOC.
+			 */
+			val->intval = chip->icharging * 1000;
 			break;
 		case POWER_SUPPLY_PROP_TEMP:
 			if (oplus_vooc_get_fastchg_started() == true) {
