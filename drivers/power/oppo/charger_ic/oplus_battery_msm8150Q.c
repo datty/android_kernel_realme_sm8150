@@ -11670,6 +11670,22 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 #endif
 		break;
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
+#ifdef OPLUS_FEATURE_CHG_BASIC
+		/*
+		 * Fuel-gauge cycle count (BQ27541/28z610 reg CC). Do not use
+		 * chip->batt_cc here — that field is stored * vbatt_num for
+		 * internal oplus math. Android Settings "Battery cycle count"
+		 * expects a plain cycle integer from power_supply cycle_count.
+		 */
+		if (g_oplus_chip) {
+			int cc = oplus_gauge_get_batt_cc();
+
+			if (cc > 0) {
+				val->intval = cc;
+				break;
+			}
+		}
+#endif
 		rc = smblib_get_prop_from_bms(chg,
 				POWER_SUPPLY_PROP_CYCLE_COUNT, val);
 		break;
